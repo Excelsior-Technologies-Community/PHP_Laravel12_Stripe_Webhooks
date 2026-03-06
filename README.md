@@ -3,7 +3,6 @@
 ![Laravel](https://img.shields.io/badge/Laravel-12-red)
 ![PHP](https://img.shields.io/badge/PHP-8%2B-blue)
 ![Stripe](https://img.shields.io/badge/Stripe-Payments-purple)
-![License](https://img.shields.io/badge/license-MIT-green)
 
 ---
 
