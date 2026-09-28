@@ -10,6 +10,10 @@ class Order extends Model
         'product_name',
         'amount',
         'stripe_session_id',
-        'payment_status'
+        'payment_status',
+    ];
+
+    protected $casts = [
+        'amount' => 'integer',
     ];
 }
