@@ -2,32 +2,84 @@
 
 return [
 
-    // Stripe webhook signing secret
-    'signing_secret' => env('STRIPE_WEBHOOK_SECRET'),
+    /*
+    |--------------------------------------------------------------------------
+    | Stripe Webhook Signing Secret
+    |--------------------------------------------------------------------------
+    */
 
-    // Default job for other Stripe events
+    'signing_secret' => env(
+        'STRIPE_WEBHOOK_SECRET'
+    ),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Default Job
+    |--------------------------------------------------------------------------
+    */
+
     'default_job' => '',
 
-    // Map Stripe events to Laravel jobs
+    /*
+    |--------------------------------------------------------------------------
+    | Stripe Event Jobs
+    |--------------------------------------------------------------------------
+    */
+
     'jobs' => [
 
-        'checkout_session_completed' => App\Jobs\HandleCheckoutSessionCompleted::class,
+        'checkout_session_completed' =>
+            App\Jobs\HandleCheckoutSessionCompleted::class,
 
     ],
 
-    // Model used to store webhook calls
-    'model' => \Spatie\WebhookClient\Models\WebhookCall::class,
+    /*
+    |--------------------------------------------------------------------------
+    | Webhook Model
+    |--------------------------------------------------------------------------
+    */
 
-    // Determines if webhook calls should be stored and processed
-    'profile' => \Spatie\StripeWebhooks\StripeWebhookProfile::class,
+    'model' =>
+        \Spatie\WebhookClient\Models\WebhookCall::class,
 
-    // Queue connection for webhook processing
-    'connection' => env('STRIPE_WEBHOOK_CONNECTION'),
+    /*
+    |--------------------------------------------------------------------------
+    | Webhook Profile
+    |--------------------------------------------------------------------------
+    */
 
-    // Queue name for webhook processing
-    'queue' => env('STRIPE_WEBHOOK_QUEUE'),
+    'profile' =>
+        \Spatie\StripeWebhooks\StripeWebhookProfile::class,
 
-    // Verify Stripe signature
-    'verify_signature' => env('STRIPE_SIGNATURE_VERIFY', true),
+    /*
+    |--------------------------------------------------------------------------
+    | Queue Connection
+    |--------------------------------------------------------------------------
+    */
+
+    'connection' => env(
+        'STRIPE_WEBHOOK_CONNECTION'
+    ),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Queue
+    |--------------------------------------------------------------------------
+    */
+
+    'queue' => env(
+        'STRIPE_WEBHOOK_QUEUE'
+    ),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Signature Verification
+    |--------------------------------------------------------------------------
+    */
+
+    'verify_signature' => env(
+        'STRIPE_SIGNATURE_VERIFY',
+        true
+    ),
 
 ];
