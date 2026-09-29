@@ -23,8 +23,10 @@
 
 <div class="container py-5">
 
-    <div class="card shadow-sm border-0 text-center mx-auto"
-         style="max-width: 600px;">
+    <div
+        class="card shadow-sm border-0 text-center mx-auto"
+        style="max-width: 600px;"
+    >
 
         <div class="card-body p-5">
 
@@ -40,6 +42,21 @@
                 The Stripe Checkout payment was cancelled.
             </p>
 
+            @if($order)
+
+                <div class="alert alert-warning mt-4">
+
+                    Order #{{ $order->id }}
+
+                    <br>
+
+                    Status:
+                    {{ ucfirst($order->payment_status) }}
+
+                </div>
+
+            @endif
+
             <div class="mt-4">
 
                 <a
@@ -47,6 +64,13 @@
                     class="btn btn-primary"
                 >
                     Try Again
+                </a>
+
+                <a
+                    href="{{ route('orders') }}"
+                    class="btn btn-outline-dark"
+                >
+                    Orders
                 </a>
 
                 <a

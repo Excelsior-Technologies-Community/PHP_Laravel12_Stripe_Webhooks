@@ -31,7 +31,6 @@ Route::get(
 |--------------------------------------------------------------------------
 */
 
-
 Route::get(
     '/success',
     [PaymentController::class, 'success']
@@ -42,11 +41,9 @@ Route::get(
     [PaymentController::class, 'cancel']
 )->name('payment.cancel');
 
-
-
 /*
 |--------------------------------------------------------------------------
-| Payment Dashboard
+| Dashboard
 |--------------------------------------------------------------------------
 */
 
@@ -66,9 +63,19 @@ Route::get(
     [PaymentDashboardController::class, 'orders']
 )->name('orders');
 
+Route::get(
+    '/orders/export',
+    [PaymentDashboardController::class, 'exportOrders']
+)->name('orders.export');
+
+Route::get(
+    '/orders/{order}',
+    [PaymentDashboardController::class, 'orderDetails']
+)->name('orders.details');
+
 /*
 |--------------------------------------------------------------------------
-| Webhook Events
+| Webhooks
 |--------------------------------------------------------------------------
 */
 
@@ -77,11 +84,10 @@ Route::get(
     [PaymentDashboardController::class, 'webhookEvents']
 )->name('webhook.events');
 
-/*
-|--------------------------------------------------------------------------
-| Webhook Details
-|--------------------------------------------------------------------------
-*/
+Route::get(
+    '/webhook-events/{webhookEvent}/download',
+    [PaymentDashboardController::class, 'downloadWebhook']
+)->name('webhook.download');
 
 Route::get(
     '/webhook-events/{webhookEvent}',
@@ -92,11 +98,6 @@ Route::get(
 |--------------------------------------------------------------------------
 | Stripe Webhook
 |--------------------------------------------------------------------------
-|
-| IMPORTANT:
-| This must use Spatie's Stripe webhook route.
-| Do not use Route::post() with a closure here.
-|
 */
 
 Route::stripeWebhooks('stripe/webhook');

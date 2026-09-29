@@ -18,59 +18,51 @@ class HandleCheckoutSessionCompleted implements ShouldQueue
     use Queueable;
     use SerializesModels;
 
-    /**
-     * Create a new job instance.
-     */
     public function __construct(
         public WebhookCall $webhookCall
     ) {
     }
 
     /**
-     * Execute the job.
+     * Execute job.
      */
     public function handle(): void
     {
         $payload = $this->webhookCall->payload;
 
-        /*
-        |--------------------------------------------------------------------------
-        | Get Stripe event information
-        |--------------------------------------------------------------------------
-        */
-
         $eventId = $payload['id'] ?? null;
 
-        $eventType = $payload['type']
-            ?? 'checkout.session.completed';
+        $eventType = $payload['type'] ?? null;
 
-        $session = $payload['data']['object'] ?? [];
+        $eventCreatedAt = null;
 
-        $sessionId = $session['id'] ?? null;
+        if (!empty($payload['created'])) {
+            $eventCreatedAt = date(
+                'Y-m-d H:i:s',
+                $payload['created']
+            );
+        }
 
-        $stripePaymentStatus = $session['payment_status'] ?? null;
-
-        /*
-        |--------------------------------------------------------------------------
-        | Get Laravel Order ID from Stripe metadata
-        |--------------------------------------------------------------------------
-        */
-
-        $orderId = $session['metadata']['order_id'] ?? null;
-
-        /*
-        |--------------------------------------------------------------------------
-        | Stop if Stripe event ID is missing
-        |--------------------------------------------------------------------------
-        */
-
-        if (!$eventId) {
+        if (!$eventId || !$eventType) {
             return;
         }
 
+        $object = $payload['data']['object'] ?? [];
+
+        $sessionId = $object['id'] ?? null;
+
+        $paymentStatus =
+            $object['payment_status'] ?? null;
+
+        $paymentIntentId =
+            $object['payment_intent'] ?? null;
+
+        $orderId =
+            $object['metadata']['order_id'] ?? null;
+
         /*
         |--------------------------------------------------------------------------
-        | Create or update webhook event history
+        | Create webhook history
         |--------------------------------------------------------------------------
         */
 
@@ -80,31 +72,19 @@ class HandleCheckoutSessionCompleted implements ShouldQueue
             ],
             [
                 'event_type' => $eventType,
+                'event_created_at' => $eventCreatedAt,
                 'status' => 'received',
+                'attempts' => 1,
                 'stripe_session_id' => $sessionId,
-                'payment_status' => $stripePaymentStatus,
+                'payment_status' => $paymentStatus,
                 'payload' => $payload,
+                'error_message' => null,
             ]
         );
 
         /*
         |--------------------------------------------------------------------------
-        | Stop if Checkout Session ID is missing
-        |--------------------------------------------------------------------------
-        */
-
-        if (!$sessionId) {
-            $webhookEvent->update([
-                'status' => 'failed',
-                'processed_at' => now(),
-            ]);
-
-            return;
-        }
-
-        /*
-        |--------------------------------------------------------------------------
-        | Find Laravel order using metadata
+        | Find order
         |--------------------------------------------------------------------------
         */
 
@@ -114,13 +94,7 @@ class HandleCheckoutSessionCompleted implements ShouldQueue
             $order = Order::find($orderId);
         }
 
-        /*
-        |--------------------------------------------------------------------------
-        | Fallback: Find order using Stripe Session ID
-        |--------------------------------------------------------------------------
-        */
-
-        if (!$order) {
+        if (!$order && $sessionId) {
             $order = Order::where(
                 'stripe_session_id',
                 $sessionId
@@ -129,13 +103,30 @@ class HandleCheckoutSessionCompleted implements ShouldQueue
 
         /*
         |--------------------------------------------------------------------------
-        | Stripe event received but no matching Laravel order
+        | Payment Intent events
         |--------------------------------------------------------------------------
-        |
-        | This can happen with Stripe CLI fixture events.
-        | The webhook itself is valid, but it does not belong to
-        | any order created by this Laravel application.
-        |
+        */
+
+        if (
+            in_array($eventType, [
+                'payment_intent.payment_failed',
+                'payment_intent.succeeded',
+            ])
+        ) {
+            $paymentIntentId = $object['id'] ?? null;
+
+            if ($paymentIntentId) {
+                $order = Order::where(
+                    'payment_intent_id',
+                    $paymentIntentId
+                )->first();
+            }
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | No matching order
+        |--------------------------------------------------------------------------
         */
 
         if (!$order) {
@@ -149,13 +140,103 @@ class HandleCheckoutSessionCompleted implements ShouldQueue
 
         /*
         |--------------------------------------------------------------------------
-        | Mark Laravel order as paid
+        | Checkout completed
         |--------------------------------------------------------------------------
         */
 
-        if ($stripePaymentStatus === 'paid') {
+        if ($eventType === 'checkout.session.completed') {
+            $customerEmail =
+                $object['customer_details']['email']
+                ?? null;
+
+            $updates = [
+                'payment_intent_id' => $paymentIntentId,
+            ];
+
+            if ($customerEmail) {
+                $updates['customer_email'] =
+                    $customerEmail;
+            }
+
+            if ($paymentStatus === 'paid') {
+                $updates['payment_status'] = 'paid';
+                $updates['paid_at'] = now();
+            }
+
+            $order->update($updates);
+
+            $webhookEvent->update([
+                'status' =>
+                    $paymentStatus === 'paid'
+                        ? 'processed'
+                        : 'failed',
+
+                'payment_status' => $paymentStatus,
+
+                'processed_at' => now(),
+            ]);
+
+            return;
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Checkout expired
+        |--------------------------------------------------------------------------
+        */
+
+        if ($eventType === 'checkout.session.expired') {
+            $order->update([
+                'payment_status' => 'cancelled',
+            ]);
+
+            $webhookEvent->update([
+                'status' => 'processed',
+                'payment_status' => 'cancelled',
+                'processed_at' => now(),
+            ]);
+
+            return;
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Payment failed
+        |--------------------------------------------------------------------------
+        */
+
+        if ($eventType === 'payment_intent.payment_failed') {
+            $failureReason =
+                $object['last_payment_error']['message']
+                ?? 'Payment failed';
+
+            $order->update([
+                'payment_status' => 'failed',
+                'payment_intent_id' => $paymentIntentId,
+                'failure_reason' => $failureReason,
+            ]);
+
+            $webhookEvent->update([
+                'status' => 'processed',
+                'payment_status' => 'failed',
+                'error_message' => $failureReason,
+                'processed_at' => now(),
+            ]);
+
+            return;
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Payment succeeded
+        |--------------------------------------------------------------------------
+        */
+
+        if ($eventType === 'payment_intent.succeeded') {
             $order->update([
                 'payment_status' => 'paid',
+                'payment_intent_id' => $paymentIntentId,
+                'paid_at' => now(),
             ]);
 
             $webhookEvent->update([
@@ -169,13 +250,32 @@ class HandleCheckoutSessionCompleted implements ShouldQueue
 
         /*
         |--------------------------------------------------------------------------
-        | Payment was not marked as paid
+        | Refund
+        |--------------------------------------------------------------------------
+        */
+
+        if ($eventType === 'charge.refunded') {
+            $order->update([
+                'payment_status' => 'refunded',
+            ]);
+
+            $webhookEvent->update([
+                'status' => 'processed',
+                'payment_status' => 'refunded',
+                'processed_at' => now(),
+            ]);
+
+            return;
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Unknown event
         |--------------------------------------------------------------------------
         */
 
         $webhookEvent->update([
-            'status' => 'failed',
-            'payment_status' => $stripePaymentStatus,
+            'status' => 'processed',
             'processed_at' => now(),
         ]);
     }

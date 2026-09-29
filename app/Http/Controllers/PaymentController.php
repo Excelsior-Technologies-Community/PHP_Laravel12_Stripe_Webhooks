@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Order;
+use Illuminate\Http\Request;
 use Stripe\Checkout\Session;
 use Stripe\Stripe;
 
@@ -13,17 +14,16 @@ class PaymentController extends Controller
      */
     public function checkout()
     {
-        // Set Stripe secret key
         Stripe::setApiKey(env('STRIPE_SECRET'));
 
-        // Create order in database
         $order = Order::create([
             'product_name' => 'Test Product',
+            'customer_email' => null,
             'amount' => 1000,
+            'currency' => 'usd',
             'payment_status' => 'pending',
         ]);
 
-        // Create Stripe Checkout Session
         $session = Session::create([
             'payment_method_types' => ['card'],
 
@@ -32,7 +32,7 @@ class PaymentController extends Controller
             'line_items' => [
                 [
                     'price_data' => [
-                        'currency' => 'usd',
+                        'currency' => $order->currency,
 
                         'product_data' => [
                             'name' => $order->product_name,
@@ -45,12 +45,10 @@ class PaymentController extends Controller
                 ],
             ],
 
-            // Connect Stripe Checkout Session with Laravel Order
             'metadata' => [
                 'order_id' => $order->id,
             ],
 
-            // Send Stripe Checkout Session ID to Laravel
             'success_url' => url(
                 '/success?session_id={CHECKOUT_SESSION_ID}'
             ),
@@ -60,45 +58,52 @@ class PaymentController extends Controller
             ),
         ]);
 
-        // Save Stripe Session ID
         $order->update([
             'stripe_session_id' => $session->id,
+            'payment_intent_id' => $session->payment_intent,
         ]);
 
-        // Redirect customer to Stripe Checkout
         return redirect($session->url);
     }
 
     /**
-     * Handle successful Stripe payment.
+     * Successful payment.
      */
-    public function success()
+    public function success(Request $request)
     {
-        $sessionId = request('session_id');
+        $sessionId = $request->session_id;
 
         $order = null;
 
         if ($sessionId) {
-            // Set Stripe secret key
             Stripe::setApiKey(env('STRIPE_SECRET'));
 
-            // Retrieve the exact Stripe Checkout Session
             $session = Session::retrieve($sessionId);
 
-            // Find Laravel order using Stripe Session ID
             $order = Order::where(
                 'stripe_session_id',
                 $session->id
             )->first();
 
-            // Mark order as paid
-            if (
-                $order &&
-                $session->payment_status === 'paid'
-            ) {
-                $order->update([
-                    'payment_status' => 'paid',
-                ]);
+            if ($order) {
+                $updates = [
+                    'payment_intent_id' => $session->payment_intent,
+                ];
+
+                if (
+                    !empty($session->customer_details) &&
+                    !empty($session->customer_details->email)
+                ) {
+                    $updates['customer_email'] =
+                        $session->customer_details->email;
+                }
+
+                if ($session->payment_status === 'paid') {
+                    $updates['payment_status'] = 'paid';
+                    $updates['paid_at'] = now();
+                }
+
+                $order->update($updates);
             }
         }
 
@@ -106,11 +111,11 @@ class PaymentController extends Controller
     }
 
     /**
-     * Handle cancelled Stripe payment.
+     * Cancelled payment.
      */
-    public function cancel()
+    public function cancel(Request $request)
     {
-        $sessionId = request('session_id');
+        $sessionId = $request->session_id;
 
         $order = null;
 
@@ -120,7 +125,6 @@ class PaymentController extends Controller
                 $sessionId
             )->first();
 
-            // Mark pending order as cancelled
             if (
                 $order &&
                 $order->payment_status === 'pending'
