@@ -23,10 +23,12 @@
 
 <div class="container py-5">
 
-    <div class="card shadow-sm border-0 text-center mx-auto"
-         style="max-width: 600px;">
+    <div
+        class="card shadow-sm border-0 mx-auto"
+        style="max-width: 650px;"
+    >
 
-        <div class="card-body p-5">
+        <div class="card-body p-5 text-center">
 
             <div class="display-4 mb-3">
                 ✓
@@ -40,13 +42,44 @@
                 Your Stripe payment was completed successfully.
             </p>
 
+            @if($order)
+
+                <div class="alert alert-success text-start mt-4">
+
+                    <strong>
+                        Order #{{ $order->id }}
+                    </strong>
+
+                    <br>
+
+                    Product:
+                    {{ $order->product_name }}
+
+                    <br>
+
+                    Amount:
+                    {{ $order->formattedAmount() }}
+
+                    @if($order->customer_email)
+
+                        <br>
+
+                        Email:
+                        {{ $order->customer_email }}
+
+                    @endif
+
+                </div>
+
+            @endif
+
             <div class="mt-4">
 
                 <a
                     href="{{ route('dashboard') }}"
                     class="btn btn-dark"
                 >
-                    Go to Dashboard
+                    Dashboard
                 </a>
 
                 <a

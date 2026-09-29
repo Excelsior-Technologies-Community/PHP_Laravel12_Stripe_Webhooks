@@ -34,7 +34,7 @@
         }
 
         .stat-number {
-            font-size: 30px;
+            font-size: 28px;
             font-weight: 700;
         }
 
@@ -42,10 +42,6 @@
             border: none;
             border-radius: 15px;
             box-shadow: 0 4px 15px rgba(0,0,0,.07);
-        }
-
-        .table th {
-            white-space: nowrap;
         }
 
         .session-id {
@@ -109,95 +105,56 @@
             Payment Overview
         </h2>
 
-        <p class="text-muted mb-0">
+        <p class="text-muted">
             Monitor Stripe payments and webhook activity.
         </p>
 
     </div>
 
-    <!-- Payment Statistics -->
-
     <div class="row g-4 mb-4">
 
-        <div class="col-md-3">
+        @foreach([
+            ['Total Orders', $totalOrders, 'dark'],
+            ['Paid Orders', $paidOrders, 'success'],
+            ['Pending Orders', $pendingOrders, 'warning'],
+            ['Cancelled Orders', $cancelledOrders, 'secondary'],
+            ['Failed Orders', $failedOrders, 'danger'],
+            ['Refunded Orders', $refundedOrders, 'info'],
+            ['Processed Webhooks', $processedWebhooks, 'success'],
+            ['Failed Webhooks', $failedWebhooks, 'danger'],
+        ] as $stat)
 
-            <div class="card stat-card p-3">
+            <div class="col-md-3">
 
-                <div class="text-muted">
-                    Total Orders
-                </div>
+                <div class="card stat-card p-3">
 
-                <div class="stat-number">
-                    {{ $totalOrders }}
-                </div>
+                    <div class="text-muted">
+                        {{ $stat[0] }}
+                    </div>
 
-            </div>
+                    <div class="stat-number text-{{ $stat[2] }}">
+                        {{ $stat[1] }}
+                    </div>
 
-        </div>
-
-        <div class="col-md-3">
-
-            <div class="card stat-card p-3">
-
-                <div class="text-muted">
-                    Paid Orders
-                </div>
-
-                <div class="stat-number text-success">
-                    {{ $paidOrders }}
                 </div>
 
             </div>
 
-        </div>
-
-        <div class="col-md-3">
-
-            <div class="card stat-card p-3">
-
-                <div class="text-muted">
-                    Pending Orders
-                </div>
-
-                <div class="stat-number text-warning">
-                    {{ $pendingOrders }}
-                </div>
-
-            </div>
-
-        </div>
-
-        <div class="col-md-3">
-
-            <div class="card stat-card p-3">
-
-                <div class="text-muted">
-                    Cancelled Orders
-                </div>
-
-                <div class="stat-number text-danger">
-                    {{ $cancelledOrders }}
-                </div>
-
-            </div>
-
-        </div>
+        @endforeach
 
     </div>
 
-    <!-- Revenue & Webhook Statistics -->
-
     <div class="row g-4 mb-4">
 
-        <div class="col-md-3">
+        <div class="col-md-4">
 
-            <div class="card stat-card p-3">
+            <div class="card stat-card p-4">
 
                 <div class="text-muted">
                     Total Revenue
                 </div>
 
-                <div class="stat-number">
+                <div class="stat-number text-success">
                     ${{ number_format($totalRevenue / 100, 2) }}
                 </div>
 
@@ -205,48 +162,32 @@
 
         </div>
 
-        <div class="col-md-3">
+        <div class="col-md-4">
 
-            <div class="card stat-card p-3">
+            <div class="card stat-card p-4">
 
                 <div class="text-muted">
-                    Total Webhooks
+                    Average Paid Order
                 </div>
 
                 <div class="stat-number">
-                    {{ $totalWebhooks }}
+                    ${{ number_format(($averageOrderValue ?? 0) / 100, 2) }}
                 </div>
 
             </div>
 
         </div>
 
-        <div class="col-md-3">
+        <div class="col-md-4">
 
-            <div class="card stat-card p-3">
-
-                <div class="text-muted">
-                    Processed Webhooks
-                </div>
-
-                <div class="stat-number text-success">
-                    {{ $processedWebhooks }}
-                </div>
-
-            </div>
-
-        </div>
-
-        <div class="col-md-3">
-
-            <div class="card stat-card p-3">
+            <div class="card stat-card p-4">
 
                 <div class="text-muted">
-                    Failed Webhooks
+                    Unmatched Webhooks
                 </div>
 
-                <div class="stat-number text-danger">
-                    {{ $failedWebhooks }}
+                <div class="stat-number text-secondary">
+                    {{ $unmatchedWebhooks }}
                 </div>
 
             </div>
@@ -254,8 +195,6 @@
         </div>
 
     </div>
-
-    <!-- Recent Orders -->
 
     <div class="card section-card mb-4">
 
@@ -292,8 +231,8 @@
 
                                 <th>ID</th>
                                 <th>Product</th>
+                                <th>Customer</th>
                                 <th>Amount</th>
-                                <th>Stripe Session</th>
                                 <th>Status</th>
                                 <th>Date</th>
 
@@ -316,53 +255,32 @@
                                     </td>
 
                                     <td>
-                                        ${{ number_format($order->amount / 100, 2) }}
+                                        {{ $order->customer_email ?? '-' }}
+                                    </td>
+
+                                    <td>
+                                        {{ $order->formattedAmount() }}
                                     </td>
 
                                     <td>
 
-                                        @if($order->stripe_session_id)
-
-                                            <div class="session-id">
-                                                {{ $order->stripe_session_id }}
-                                            </div>
-
-                                        @else
-
-                                            <span class="text-muted">
-                                                Not available
-                                            </span>
-
-                                        @endif
+                                        <span
+                                            class="badge bg-{{ $order->statusClass() }}"
+                                        >
+                                            {{ ucfirst($order->payment_status) }}
+                                        </span>
 
                                     </td>
 
                                     <td>
 
-                                        @if($order->payment_status === 'paid')
+                                        <a
+                                            href="{{ route('orders.details', $order) }}"
+                                            class="btn btn-sm btn-outline-dark"
+                                        >
+                                            Details
+                                        </a>
 
-                                            <span class="badge bg-success">
-                                                Paid
-                                            </span>
-
-                                        @elseif($order->payment_status === 'cancelled')
-
-                                            <span class="badge bg-danger">
-                                                Cancelled
-                                            </span>
-
-                                        @else
-
-                                            <span class="badge bg-warning text-dark">
-                                                Pending
-                                            </span>
-
-                                        @endif
-
-                                    </td>
-
-                                    <td>
-                                        {{ $order->created_at->format('d M Y H:i') }}
                                     </td>
 
                                 </tr>
@@ -387,8 +305,6 @@
 
     </div>
 
-    <!-- Recent Webhooks -->
-
     <div class="card section-card">
 
         <div class="card-header bg-white py-3">
@@ -396,7 +312,7 @@
             <div class="d-flex justify-content-between">
 
                 <h5 class="mb-0">
-                    Recent Webhook Events
+                    Recent Webhooks
                 </h5>
 
                 <a
@@ -424,7 +340,7 @@
 
                                 <th>Event</th>
                                 <th>Status</th>
-                                <th>Session ID</th>
+                                <th>Payment</th>
                                 <th>Received</th>
 
                             </tr>
@@ -443,34 +359,16 @@
 
                                     <td>
 
-                                        @if($webhook->status === 'processed')
-
-                                            <span class="badge bg-success">
-                                                Processed
-                                            </span>
-
-                                        @elseif($webhook->status === 'failed')
-
-                                            <span class="badge bg-danger">
-                                                Failed
-                                            </span>
-
-                                        @else
-
-                                            <span class="badge bg-warning text-dark">
-                                                Received
-                                            </span>
-
-                                        @endif
+                                        <span
+                                            class="badge bg-{{ $webhook->statusClass() }}"
+                                        >
+                                            {{ ucfirst($webhook->status) }}
+                                        </span>
 
                                     </td>
 
                                     <td>
-
-                                        <div class="session-id">
-                                            {{ $webhook->stripe_session_id ?? '-' }}
-                                        </div>
-
+                                        {{ $webhook->payment_status ?? '-' }}
                                     </td>
 
                                     <td>

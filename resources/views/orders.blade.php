@@ -30,7 +30,7 @@
         }
 
         .session-id {
-            max-width: 200px;
+            max-width: 180px;
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;
@@ -79,21 +79,30 @@
                     </h3>
 
                     <p class="text-muted mb-0">
-                        Search and filter Stripe payment orders.
+                        Search, filter, sort and export Stripe orders.
                     </p>
 
                 </div>
 
-                <a
-                    href="{{ route('checkout') }}"
-                    class="btn btn-primary"
-                >
-                    New Checkout
-                </a>
+                <div>
+
+                    <a
+                        href="{{ route('orders.export', request()->query()) }}"
+                        class="btn btn-success me-2"
+                    >
+                        Export CSV
+                    </a>
+
+                    <a
+                        href="{{ route('checkout') }}"
+                        class="btn btn-primary"
+                    >
+                        New Checkout
+                    </a>
+
+                </div>
 
             </div>
-
-            <!-- Search & Filters -->
 
             <form
                 method="GET"
@@ -101,7 +110,7 @@
                 class="row g-3 mb-4"
             >
 
-                <div class="col-md-4">
+                <div class="col-md-3">
 
                     <label class="form-label">
                         Search
@@ -111,7 +120,7 @@
                         type="text"
                         name="search"
                         class="form-control"
-                        placeholder="Order ID, product or Stripe session..."
+                        placeholder="ID, product, email..."
                         value="{{ request('search') }}"
                     >
 
@@ -129,35 +138,67 @@
                     >
 
                         <option value="">
-                            All Statuses
+                            All
                         </option>
 
-                        <option
-                            value="paid"
-                            {{ request('status') === 'paid' ? 'selected' : '' }}
-                        >
-                            Paid
-                        </option>
+                        @foreach([
+                            'paid' => 'Paid',
+                            'pending' => 'Pending',
+                            'cancelled' => 'Cancelled',
+                            'failed' => 'Failed',
+                            'refunded' => 'Refunded',
+                        ] as $value => $label)
 
-                        <option
-                            value="pending"
-                            {{ request('status') === 'pending' ? 'selected' : '' }}
-                        >
-                            Pending
-                        </option>
+                            <option
+                                value="{{ $value }}"
+                                {{ request('status') === $value ? 'selected' : '' }}
+                            >
+                                {{ $label }}
+                            </option>
 
-                        <option
-                            value="cancelled"
-                            {{ request('status') === 'cancelled' ? 'selected' : '' }}
-                        >
-                            Cancelled
-                        </option>
+                        @endforeach
 
                     </select>
 
                 </div>
 
                 <div class="col-md-2">
+
+                    <label class="form-label">
+                        Min Amount
+                    </label>
+
+                    <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        name="min_amount"
+                        class="form-control"
+                        placeholder="0.00"
+                        value="{{ request('min_amount') }}"
+                    >
+
+                </div>
+
+                <div class="col-md-2">
+
+                    <label class="form-label">
+                        Max Amount
+                    </label>
+
+                    <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        name="max_amount"
+                        class="form-control"
+                        placeholder="1000.00"
+                        value="{{ request('max_amount') }}"
+                    >
+
+                </div>
+
+                <div class="col-md-3">
 
                     <label class="form-label">
                         From Date
@@ -172,7 +213,7 @@
 
                 </div>
 
-                <div class="col-md-2">
+                <div class="col-md-3">
 
                     <label class="form-label">
                         To Date
@@ -187,31 +228,90 @@
 
                 </div>
 
-                <div class="col-md-2 d-flex align-items-end">
+                <div class="col-md-3">
+
+                    <label class="form-label">
+                        Sort By
+                    </label>
+
+                    <select
+                        name="sort"
+                        class="form-select"
+                    >
+
+                        @foreach([
+                            'created_at' => 'Created Date',
+                            'id' => 'Order ID',
+                            'product_name' => 'Product',
+                            'amount' => 'Amount',
+                            'payment_status' => 'Status',
+                        ] as $value => $label)
+
+                            <option
+                                value="{{ $value }}"
+                                {{ $sort === $value ? 'selected' : '' }}
+                            >
+                                {{ $label }}
+                            </option>
+
+                        @endforeach
+
+                    </select>
+
+                </div>
+
+                <div class="col-md-3">
+
+                    <label class="form-label">
+                        Direction
+                    </label>
+
+                    <select
+                        name="direction"
+                        class="form-select"
+                    >
+
+                        <option
+                            value="desc"
+                            {{ $direction === 'desc' ? 'selected' : '' }}
+                        >
+                            Descending
+                        </option>
+
+                        <option
+                            value="asc"
+                            {{ $direction === 'asc' ? 'selected' : '' }}
+                        >
+                            Ascending
+                        </option>
+
+                    </select>
+
+                </div>
+
+                <div class="col-md-3 d-flex align-items-end">
 
                     <button
                         type="submit"
                         class="btn btn-dark w-100"
                     >
-                        Search
+                        Apply Filters
                     </button>
 
                 </div>
 
+                <div class="col-md-3 d-flex align-items-end">
+
+                    <a
+                        href="{{ route('orders') }}"
+                        class="btn btn-outline-secondary w-100"
+                    >
+                        Clear
+                    </a>
+
+                </div>
+
             </form>
-
-            <div class="mb-3">
-
-                <a
-                    href="{{ route('orders') }}"
-                    class="btn btn-sm btn-outline-secondary"
-                >
-                    Clear Filters
-                </a>
-
-            </div>
-
-            <!-- Orders -->
 
             @if($orders->count())
 
@@ -225,10 +325,11 @@
 
                                 <th>ID</th>
                                 <th>Product</th>
+                                <th>Customer</th>
                                 <th>Amount</th>
-                                <th>Stripe Session</th>
                                 <th>Status</th>
                                 <th>Created</th>
+                                <th>Action</th>
 
                             </tr>
 
@@ -249,56 +350,36 @@
                                     </td>
 
                                     <td>
-                                        ${{ number_format($order->amount / 100, 2) }}
+                                        {{ $order->customer_email ?? '-' }}
+                                    </td>
+
+                                    <td>
+                                        {{ $order->formattedAmount() }}
                                     </td>
 
                                     <td>
 
-                                        @if($order->stripe_session_id)
-
-                                            <div
-                                                class="session-id"
-                                                title="{{ $order->stripe_session_id }}"
-                                            >
-                                                {{ $order->stripe_session_id }}
-                                            </div>
-
-                                        @else
-
-                                            <span class="text-muted">
-                                                -
-                                            </span>
-
-                                        @endif
-
-                                    </td>
-
-                                    <td>
-
-                                        @if($order->payment_status === 'paid')
-
-                                            <span class="badge bg-success">
-                                                Paid
-                                            </span>
-
-                                        @elseif($order->payment_status === 'cancelled')
-
-                                            <span class="badge bg-danger">
-                                                Cancelled
-                                            </span>
-
-                                        @else
-
-                                            <span class="badge bg-warning text-dark">
-                                                Pending
-                                            </span>
-
-                                        @endif
+                                        <span
+                                            class="badge bg-{{ $order->statusClass() }}"
+                                        >
+                                            {{ ucfirst($order->payment_status) }}
+                                        </span>
 
                                     </td>
 
                                     <td>
                                         {{ $order->created_at->format('d M Y H:i') }}
+                                    </td>
+
+                                    <td>
+
+                                        <a
+                                            href="{{ route('orders.details', $order) }}"
+                                            class="btn btn-sm btn-outline-dark"
+                                        >
+                                            Details
+                                        </a>
+
                                     </td>
 
                                 </tr>
@@ -311,12 +392,8 @@
 
                 </div>
 
-                <!-- Pagination -->
-
                 <div class="mt-4">
-
                     {{ $orders->links() }}
-
                 </div>
 
             @else

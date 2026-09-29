@@ -30,7 +30,7 @@
         }
 
         .event-id {
-            max-width: 230px;
+            max-width: 220px;
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;
@@ -77,12 +77,10 @@
                 </h3>
 
                 <p class="text-muted mb-0">
-                    View and inspect Stripe webhook events received by Laravel.
+                    Search, filter and inspect Stripe webhook events.
                 </p>
 
             </div>
-
-            <!-- Filters -->
 
             <form
                 method="GET"
@@ -90,7 +88,7 @@
                 class="row g-3 mb-4"
             >
 
-                <div class="col-md-5">
+                <div class="col-md-4">
 
                     <label class="form-label">
                         Search
@@ -100,16 +98,16 @@
                         type="text"
                         name="search"
                         class="form-control"
-                        placeholder="Event ID, event type or session ID..."
+                        placeholder="Event ID, session..."
                         value="{{ request('search') }}"
                     >
 
                 </div>
 
-                <div class="col-md-3">
+                <div class="col-md-2">
 
                     <label class="form-label">
-                        Processing Status
+                        Status
                     </label>
 
                     <select
@@ -118,7 +116,7 @@
                     >
 
                         <option value="">
-                            All Statuses
+                            All
                         </option>
 
                         <option
@@ -142,22 +140,89 @@
                             Failed
                         </option>
 
+                        <option
+                            value="unmatched"
+                            {{ request('status') === 'unmatched' ? 'selected' : '' }}
+                        >
+                            Unmatched
+                        </option>
+
                     </select>
 
                 </div>
 
-                <div class="col-md-2 d-flex align-items-end">
+                <div class="col-md-3">
+
+                    <label class="form-label">
+                        Event Type
+                    </label>
+
+                    <select
+                        name="event_type"
+                        class="form-select"
+                    >
+
+                        <option value="">
+                            All Events
+                        </option>
+
+                        @foreach($eventTypes as $type)
+
+                            <option
+                                value="{{ $type }}"
+                                {{ request('event_type') === $type ? 'selected' : '' }}
+                            >
+                                {{ $type }}
+                            </option>
+
+                        @endforeach
+
+                    </select>
+
+                </div>
+
+                <div class="col-md-3">
+
+                    <label class="form-label">
+                        From Date
+                    </label>
+
+                    <input
+                        type="date"
+                        name="from_date"
+                        class="form-control"
+                        value="{{ request('from_date') }}"
+                    >
+
+                </div>
+
+                <div class="col-md-3">
+
+                    <label class="form-label">
+                        To Date
+                    </label>
+
+                    <input
+                        type="date"
+                        name="to_date"
+                        class="form-control"
+                        value="{{ request('to_date') }}"
+                    >
+
+                </div>
+
+                <div class="col-md-3 d-flex align-items-end">
 
                     <button
                         type="submit"
                         class="btn btn-dark w-100"
                     >
-                        Search
+                        Apply Filters
                     </button>
 
                 </div>
 
-                <div class="col-md-2 d-flex align-items-end">
+                <div class="col-md-3 d-flex align-items-end">
 
                     <a
                         href="{{ route('webhook.events') }}"
@@ -184,6 +249,7 @@
                                 <th>Event Type</th>
                                 <th>Status</th>
                                 <th>Payment</th>
+                                <th>Attempts</th>
                                 <th>Received</th>
                                 <th>Action</th>
 
@@ -214,44 +280,30 @@
 
                                     <td>
 
-                                        @if($event->status === 'processed')
+                                        <span
+                                            class="badge bg-{{ $event->statusClass() }}"
+                                        >
+                                            {{ ucfirst($event->status) }}
+                                        </span>
 
-                                            <span class="badge bg-success">
-                                                Processed
-                                            </span>
+                                    </td>
 
-                                        @elseif($event->status === 'failed')
+                                    <td>
 
-                                            <span class="badge bg-danger">
-                                                Failed
-                                            </span>
+                                        @if($event->payment_status)
+
+                                            {{ ucfirst($event->payment_status) }}
 
                                         @else
 
-                                            <span class="badge bg-warning text-dark">
-                                                Received
-                                            </span>
+                                            -
 
                                         @endif
 
                                     </td>
 
                                     <td>
-
-                                        @if($event->payment_status === 'paid')
-
-                                            <span class="badge bg-success">
-                                                Paid
-                                            </span>
-
-                                        @else
-
-                                            <span class="text-muted">
-                                                -
-                                            </span>
-
-                                        @endif
-
+                                        {{ $event->attempts }}
                                     </td>
 
                                     <td>
@@ -264,7 +316,7 @@
                                             href="{{ route('webhook.details', $event) }}"
                                             class="btn btn-sm btn-outline-dark"
                                         >
-                                            View Details
+                                            Details
                                         </a>
 
                                     </td>
@@ -280,9 +332,7 @@
                 </div>
 
                 <div class="mt-4">
-
                     {{ $webhookEvents->links() }}
-
                 </div>
 
             @else
