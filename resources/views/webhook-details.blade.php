@@ -34,7 +34,7 @@
             color: #f8f9fa;
             padding: 20px;
             border-radius: 10px;
-            max-height: 600px;
+            max-height: 650px;
             overflow: auto;
         }
 
@@ -81,17 +81,28 @@
                     </h3>
 
                     <p class="text-muted mb-0">
-                        Detailed Stripe webhook information.
+                        Complete Stripe webhook information.
                     </p>
 
                 </div>
 
-                <a
-                    href="{{ route('webhook.events') }}"
-                    class="btn btn-secondary"
-                >
-                    Back
-                </a>
+                <div>
+
+                    <a
+                        href="{{ route('webhook.download', $webhookEvent) }}"
+                        class="btn btn-success me-2"
+                    >
+                        Download JSON
+                    </a>
+
+                    <a
+                        href="{{ route('webhook.events') }}"
+                        class="btn btn-secondary"
+                    >
+                        Back
+                    </a>
+
+                </div>
 
             </div>
 
@@ -129,35 +140,21 @@
 
                 </div>
 
-                <div class="col-md-4">
+                <div class="col-md-3">
 
                     <div class="border rounded p-3">
 
                         <small class="text-muted">
-                            Processing Status
+                            Status
                         </small>
 
                         <div class="mt-1">
 
-                            @if($webhookEvent->status === 'processed')
-
-                                <span class="badge bg-success">
-                                    Processed
-                                </span>
-
-                            @elseif($webhookEvent->status === 'failed')
-
-                                <span class="badge bg-danger">
-                                    Failed
-                                </span>
-
-                            @else
-
-                                <span class="badge bg-warning text-dark">
-                                    Received
-                                </span>
-
-                            @endif
+                            <span
+                                class="badge bg-{{ $webhookEvent->statusClass() }}"
+                            >
+                                {{ ucfirst($webhookEvent->status) }}
+                            </span>
 
                         </div>
 
@@ -165,29 +162,17 @@
 
                 </div>
 
-                <div class="col-md-4">
+                <div class="col-md-3">
 
                     <div class="border rounded p-3">
 
                         <small class="text-muted">
-                            Payment Status
+                            Payment
                         </small>
 
                         <div class="mt-1">
 
-                            @if($webhookEvent->payment_status === 'paid')
-
-                                <span class="badge bg-success">
-                                    Paid
-                                </span>
-
-                            @else
-
-                                <span class="text-muted">
-                                    Not available
-                                </span>
-
-                            @endif
+                            {{ $webhookEvent->payment_status ?? '-' }}
 
                         </div>
 
@@ -195,12 +180,28 @@
 
                 </div>
 
-                <div class="col-md-4">
+                <div class="col-md-3">
 
                     <div class="border rounded p-3">
 
                         <small class="text-muted">
-                            Processed At
+                            Attempts
+                        </small>
+
+                        <div class="fw-semibold">
+                            {{ $webhookEvent->attempts }}
+                        </div>
+
+                    </div>
+
+                </div>
+
+                <div class="col-md-3">
+
+                    <div class="border rounded p-3">
+
+                        <small class="text-muted">
+                            Processed
                         </small>
 
                         <div class="fw-semibold">
@@ -211,9 +212,7 @@
 
                             @else
 
-                                <span class="text-muted">
-                                    Not processed
-                                </span>
+                                Not processed
 
                             @endif
 
@@ -225,6 +224,20 @@
 
             </div>
 
+            @if($webhookEvent->error_message)
+
+                <div class="alert alert-danger">
+
+                    <strong>
+                        Error:
+                    </strong>
+
+                    {{ $webhookEvent->error_message }}
+
+                </div>
+
+            @endif
+
             <div class="mb-4">
 
                 <h5 class="fw-bold">
@@ -232,9 +245,7 @@
                 </h5>
 
                 <div class="border rounded p-3 text-break">
-
                     {{ $webhookEvent->stripe_session_id ?? 'Not available' }}
-
                 </div>
 
             </div>
