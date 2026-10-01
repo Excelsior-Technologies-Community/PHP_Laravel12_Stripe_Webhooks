@@ -17,12 +17,19 @@ class WebhookEvent extends Model
         'payment_status',
         'payload',
         'processed_at',
+        'is_simulated',
+        'retry_count',
+        'signature_valid',
+        'headers_json',
     ];
 
     protected $casts = [
         'payload' => 'array',
+        'headers_json' => 'array',
         'processed_at' => 'datetime',
         'event_created_at' => 'datetime',
+        'is_simulated' => 'boolean',
+        'signature_valid' => 'boolean',
     ];
 
     /**
@@ -31,10 +38,10 @@ class WebhookEvent extends Model
     public function statusClass(): string
     {
         return match ($this->status) {
-            'processed' => 'success',
+            'processed', 'replayed' => 'success',
             'failed' => 'danger',
             'unmatched' => 'secondary',
-            'received' => 'warning',
+            'received', 'simulated' => 'warning',
             default => 'dark',
         };
     }

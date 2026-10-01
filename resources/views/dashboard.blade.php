@@ -85,6 +85,20 @@
             </a>
 
             <a
+                href="{{ route('webhook.studio') }}"
+                class="btn btn-warning btn-sm me-2 fw-bold"
+            >
+                ⚡ Webhook Studio
+            </a>
+
+            <a
+                href="{{ route('revenue.analytics') }}"
+                class="btn btn-info btn-sm me-2 fw-bold text-white"
+            >
+                📈 Revenue Analytics
+            </a>
+
+            <a
                 href="{{ route('checkout') }}"
                 class="btn btn-primary btn-sm"
             >
