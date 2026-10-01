@@ -96,6 +96,45 @@ Route::get(
 
 /*
 |--------------------------------------------------------------------------
+| Webhook Live Replay Simulator & Signature Inspector
+|--------------------------------------------------------------------------
+*/
+
+Route::get(
+    '/webhook-studio',
+    [PaymentDashboardController::class, 'webhookStudio']
+)->name('webhook.studio');
+
+Route::post(
+    '/webhook-studio/replay/{webhookEvent}',
+    [PaymentDashboardController::class, 'replayWebhook']
+)->name('webhook.replay');
+
+Route::post(
+    '/webhook-studio/simulate',
+    [PaymentDashboardController::class, 'simulateWebhook']
+)->name('webhook.simulate');
+
+
+/*
+|--------------------------------------------------------------------------
+| Real-Time Revenue Analytics & Subscription Churn Radar
+|--------------------------------------------------------------------------
+*/
+
+Route::get(
+    '/revenue-analytics',
+    [PaymentDashboardController::class, 'revenueAnalytics']
+)->name('revenue.analytics');
+
+Route::post(
+    '/revenue-analytics/trigger-recovery',
+    [PaymentDashboardController::class, 'triggerRecovery']
+)->name('revenue.triggerRecovery');
+
+
+/*
+|--------------------------------------------------------------------------
 | Stripe Webhook
 |--------------------------------------------------------------------------
 */

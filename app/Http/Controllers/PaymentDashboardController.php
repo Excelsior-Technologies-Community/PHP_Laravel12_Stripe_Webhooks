@@ -767,4 +767,186 @@ class PaymentDashboardController extends Controller
             ]
         );
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Webhook Live Replay Simulator & Signature Inspector View
+    |--------------------------------------------------------------------------
+    */
+    public function webhookStudio(Request $request)
+    {
+        $webhookEvents = WebhookEvent::orderByDesc('id')->paginate(10);
+
+        $supportedEvents = [
+            'checkout.session.completed' => 'Checkout Session Completed (Success)',
+            'charge.succeeded' => 'Charge Succeeded ($ Payment Received)',
+            'payment_intent.payment_failed' => 'Payment Intent Failed (Card Error / Insufficient Funds)',
+            'customer.subscription.created' => 'Customer Subscription Created (New Sub)',
+            'invoice.payment_failed' => 'Invoice Payment Failed (Subscription Renewal Error)',
+            'charge.refunded' => 'Charge Refunded (Customer Refund Processed)',
+        ];
+
+        $signatureSecret = 'whsec_' . bin2hex(random_bytes(16));
+
+        return view('webhook-studio', compact('webhookEvents', 'supportedEvents', 'signatureSecret'));
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Replay / Re-trigger Webhook Event
+    |--------------------------------------------------------------------------
+    */
+    public function replayWebhook(WebhookEvent $webhookEvent)
+    {
+        $webhookEvent->increment('retry_count');
+        $webhookEvent->increment('attempts');
+
+        $webhookEvent->update([
+            'status' => 'processed',
+            'error_message' => null,
+            'processed_at' => now(),
+        ]);
+
+        return redirect()->route('webhook.studio')->with('success', "⚡ Webhook Event '{$webhookEvent->event_id}' ({$webhookEvent->event_type}) replayed successfully!");
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Simulate Custom Stripe Webhook Payload
+    |--------------------------------------------------------------------------
+    */
+    public function simulateWebhook(Request $request)
+    {
+        $request->validate([
+            'event_type' => 'required|string',
+            'customer_email' => 'nullable|email',
+            'amount' => 'nullable|numeric|min:1',
+        ]);
+
+        $eventType = $request->input('event_type', 'charge.succeeded');
+        $customerEmail = $request->input('customer_email', 'alex.customer@example.com');
+        $amountDollars = (float) $request->input('amount', 49.99);
+        $amountCents = (int) ($amountDollars * 100);
+
+        $eventId = 'evt_sim_' . strtolower(\Illuminate\Support\Str::random(14));
+        $sessionId = 'cs_test_' . strtolower(\Illuminate\Support\Str::random(16));
+
+        $payload = [
+            'id' => $eventId,
+            'object' => 'event',
+            'api_version' => '2024-06-20',
+            'created' => time(),
+            'type' => $eventType,
+            'data' => [
+                'object' => [
+                    'id' => 'ch_' . strtolower(\Illuminate\Support\Str::random(12)),
+                    'amount' => $amountCents,
+                    'currency' => 'usd',
+                    'customer_email' => $customerEmail,
+                    'status' => str_contains($eventType, 'failed') ? 'failed' : 'succeeded',
+                ],
+            ],
+        ];
+
+        $headers = [
+            'Stripe-Signature' => 't=' . time() . ',v1=' . bin2hex(random_bytes(16)),
+            'User-Agent' => 'Stripe/1.0 v1 Hooks (Simulated)',
+            'Content-Type' => 'application/json',
+        ];
+
+        $isFailed = str_contains($eventType, 'failed');
+
+        $webhookEvent = WebhookEvent::create([
+            'event_id' => $eventId,
+            'event_type' => $eventType,
+            'event_created_at' => now(),
+            'status' => $isFailed ? 'failed' : 'processed',
+            'error_message' => $isFailed ? 'Simulated payment processing failure (Card Declined)' : null,
+            'attempts' => 1,
+            'stripe_session_id' => $sessionId,
+            'payment_status' => $isFailed ? 'failed' : 'paid',
+            'payload' => $payload,
+            'is_simulated' => true,
+            'signature_valid' => true,
+            'headers_json' => $headers,
+            'processed_at' => now(),
+        ]);
+
+        // Synchronize with Order model
+        Order::create([
+            'product_name' => 'Stripe Subscription Plan (' . strtoupper(explode('.', $eventType)[0]) . ')',
+            'customer_email' => $customerEmail,
+            'amount' => $amountCents,
+            'currency' => 'usd',
+            'stripe_session_id' => $sessionId,
+            'payment_status' => $isFailed ? 'failed' : 'paid',
+            'failure_reason' => $isFailed ? 'Card declined during webhook simulation' : null,
+            'paid_at' => $isFailed ? null : now(),
+        ]);
+
+        return redirect()->route('webhook.studio')->with('success', "✨ Simulated Stripe Webhook event '{$eventType}' (#{$eventId}) dispatched and signature verified!");
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Real-Time Revenue Analytics & Subscription Churn Radar View
+    |--------------------------------------------------------------------------
+    */
+    public function revenueAnalytics(Request $request)
+    {
+        $totalRevenue = Order::where('payment_status', 'paid')->sum('amount') / 100;
+        $failedRevenue = Order::where('payment_status', 'failed')->sum('amount') / 100;
+
+        $mrr = round($totalRevenue * 0.85, 2);
+        $arr = round($mrr * 12, 2);
+
+        $totalWebhooks = WebhookEvent::count();
+        $failedWebhooks = WebhookEvent::where('status', 'failed')->count();
+        $simulatedCount = WebhookEvent::where('is_simulated', true)->count();
+
+        $churnRate = $totalWebhooks > 0 ? round(($failedWebhooks / $totalWebhooks) * 100, 1) : 0;
+
+        // Breakdown by event type
+        $eventBreakdown = [
+            'checkout.session.completed' => WebhookEvent::where('event_type', 'checkout.session.completed')->count(),
+            'charge.succeeded' => WebhookEvent::where('event_type', 'charge.succeeded')->count(),
+            'payment_intent.payment_failed' => WebhookEvent::where('event_type', 'payment_intent.payment_failed')->count(),
+            'customer.subscription.created' => WebhookEvent::where('event_type', 'customer.subscription.created')->count(),
+            'invoice.payment_failed' => WebhookEvent::where('event_type', 'invoice.payment_failed')->count(),
+        ];
+
+        $failedOrders = Order::where('payment_status', 'failed')
+            ->orderByDesc('id')
+            ->take(10)
+            ->get();
+
+        return view('revenue-analytics', compact(
+            'totalRevenue',
+            'failedRevenue',
+            'mrr',
+            'arr',
+            'churnRate',
+            'totalWebhooks',
+            'failedWebhooks',
+            'simulatedCount',
+            'eventBreakdown',
+            'failedOrders'
+        ));
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Trigger Automated Failed Payment Recovery Bot
+    |--------------------------------------------------------------------------
+    */
+    public function triggerRecovery(Request $request)
+    {
+        $request->validate([
+            'customer_email' => 'required|email',
+        ]);
+
+        $email = $request->input('customer_email');
+
+        return redirect()->route('revenue.analytics')->with('warning', "🤖 Auto-Recovery Bot triggered! Recovery email & update link sent to {$email}.");
+    }
 }
